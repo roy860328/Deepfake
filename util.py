@@ -1,6 +1,31 @@
 import cv2
 import numpy as np
+import pandas as pd
+import json
 import matplotlib.pyplot as plt
+
+def get_data_class(json, path, videoPreprocess):
+	df_train = pd.read_json(json)
+	print(df_train)
+	df_trains = [df_train]
+
+	dataProcess = DataProcess(df_trains, path, videoPreprocess)
+	return dataProcess
+
+def processs_data_to_json(sample_submission):
+	sample_submission = sample_submission.to_json(orient='values')
+	sample_submission = json.loads(sample_submission)
+	sample_submission = {i[0]:{"label":"FAKE"} for i in sample_submission}
+	sample_submission = json.dumps(sample_submission)
+	return sample_submission
+
+def export(sample_submission, predictions):
+	if len(predictions) < len(sample_submission["filename"]):
+		[predictions.append("0.5") for _ in range(len(sample_submission["filename"])-len(predictions))]
+	sample_submission["label"] = predictions
+	print(sample_submission[0:20])
+	sample_submission.to_csv("submission.csv", index=False)
+
 
 class VideoPreprocess():
 	"""docstring for VideoPreprocess"""
@@ -20,7 +45,8 @@ class VideoPreprocess():
 	def _read_video(self, file):
 		cap = cv2.VideoCapture(file)
 		if(not cap.isOpened()):
-			raise "file error"
+			print("file didn't exist: ", file)
+			raise "file didn't exist."
 		return cap
 
 	def _video_info(self, cap):
@@ -62,11 +88,12 @@ LABELS = ['REAL','FAKE']
 
 class DataProcess():
 	"""docstring for DataProcess"""
-	def __init__(self, df_trains, videoPreprocess):
-		print("init")
+	def __init__(self, df_trains, path, videoPreprocess):
+		# print("init")
 		self.df_trains = df_trains
+		self.path = path
 		self.videoPreprocess = videoPreprocess
-	
+
 	def get_generater_data(self, data_size):
 		for df_train in self.df_trains:
 			print("\nNew df_train")
@@ -76,9 +103,10 @@ class DataProcess():
 				training_set = []
 				video_labels = []
 				for element in elements[lower:upper]:
-					frames = self.videoPreprocess.get_frames("train_sample_videos/" + element)
+					frames = self.videoPreprocess.get_frames(self.path + element)
 					training_set.append(frames)
 					video_labels.append(LABELS.index(df_train[element]['label']))
+					# video_labels.append(int(df_train[element]['label']))
 				training_set = np.asarray(training_set)
 				video_labels = np.asarray(video_labels)
 				

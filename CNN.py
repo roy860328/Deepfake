@@ -28,19 +28,44 @@ class CNNImplement():
 		cnn = Model(input=cnn_base.input, output=cnn_out)
 		cnn.trainable = False
 		encoded_frames = TimeDistributed(cnn)(video)
-		encoded_sequence = LSTM(256)(encoded_frames)
-		hidden_layer = Dense(output_dim=1024, activation="relu")(encoded_sequence)
-		outputs = Dense(output_dim=classification, activation="softmax")(hidden_layer)
+		encoded_sequence = LSTM(128)(encoded_frames)
+		hidden_layer = Dense(output_dim=512, activation="relu")(encoded_sequence)
+		outputs = Dense(output_dim=classification, activation="sigmoid")(hidden_layer)
 		self.model = Model([video], outputs)
 		optimizer = Nadam(lr=0.002,
 						  beta_1=0.9,
 						  beta_2=0.999,
 						  epsilon=1e-08,
 						  schedule_decay=0.004)
-		self.model.compile(loss="sparse_categorical_crossentropy",
+		self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) 
+		self.model.summary()
+	## https://riptutorial.com/keras/example/29812/vgg-16-cnn-and-lstm-for-video-classification
+	def ori_create_model(self):
+		video = Input(shape=(frames,
+					 channels,
+					 rows,
+					 columns))
+		cnn_base = VGG16(input_shape=(channels,
+									  rows,
+									  columns),
+						 weights="imagenet",
+						 include_top=False)
+		cnn_out = GlobalAveragePooling2D()(cnn_base.output)
+		cnn = Model(input=cnn_base.input, output=cnn_out)
+		cnn.trainable = False
+		encoded_frames = TimeDistributed(cnn)(video)
+		encoded_sequence = LSTM(256)(encoded_frames)
+		hidden_layer = Dense(output_dim=1024, activation="relu")(encoded_sequence)
+		outputs = Dense(output_dim=classes, activation="softmax")(hidden_layer)
+		model = Model([video], outputs)
+		optimizer = Nadam(lr=0.002,
+						  beta_1=0.9,
+						  beta_2=0.999,
+						  epsilon=1e-08,
+						  schedule_decay=0.004)
+		model.compile(loss="categorical_crossentropy",
 					  optimizer=optimizer,
 					  metrics=["categorical_accuracy"]) 
-		self.model.summary()
 
 	def check_input_format(self, rows, columns):
 		if K.image_data_format() == 'channels_first':
@@ -56,14 +81,14 @@ class CNNImplement():
 
 	def train(self, train_x, train_y, epochs, batch_size):
 		# model.compile(loss='mean_squared_error', optimizer='adam')
-		self.model.fit(train_x, train_y, epochs=1, batch_size=3, verbose=2)
+		self.model.fit(train_x, train_y, epochs=epochs, batch_size=batch_size, verbose=2)
 
 	def eval(self, val_x, val_y):
 		scores = self.model.evaluate(val_x, val_y, verbose=0)
 		print("Accuracy: %.2f%%" % (scores[1]*100))
 
 	def predict(self, test_x):
-		return self.model.predict_classes(test_x)
+		return self.model.predict(test_x)
 
 if __name__ == "__main__":
 	train_x, train_y, val_x, val_y, test_x, vocabulary = preprocess()
