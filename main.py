@@ -47,17 +47,17 @@ if __name__ == "__main__":
 							columns=videoPreprocess.height, 
 							channels=3,
 							classification=1)
-
-		for x, y in training_set:
-			print(x.shape)
-			print(y)
-			model.train(train_x=x, train_y=y, epochs=1, batch_size=batch_size)
-			# break
+		for _ in range(1):
+			for x, y in training_set:
+				# print(x.shape)
+				# print(y)
+				model.train(train_x=x, train_y=y, epochs=1, batch_size=batch_size)
+				# break
 
 		predict_label = []
 		for x, y in testing_set:
 			result = model.predict(test_x=x)
 			print(result)
-			predict_label.append(result)
+			predict_label.append(str(result).replace("[", "").replace("]", ""))
 
 		util.export(sample_submission, predict_label)

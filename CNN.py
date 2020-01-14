@@ -85,7 +85,7 @@ class CNNImplement():
 
 	def eval(self, val_x, val_y):
 		scores = self.model.evaluate(val_x, val_y, verbose=0)
-		print("Accuracy: %.2f%%" % (scores[1]*100))
+		# print("Accuracy: %.2f%%" % (scores[1]*100))
 
 	def predict(self, test_x):
 		return self.model.predict(test_x)

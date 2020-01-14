@@ -35,8 +35,8 @@ class VideoPreprocess():
 		self.max_n_frames = max_n_frames
 		
 	def get_frames(self, file, print_detail=False):
-		print("\n=== Start get_frames ===")
-		print(file)
+		# print("\n=== Start get_frames ===")
+		# print(file)
 		cap = self._read_video(file)
 		if(print_detail):
 			self._video_info(cap)
@@ -117,7 +117,7 @@ class DataProcess():
 				if upper > len(list(df_train.columns.values)):
 					upper = len(list(df_train.columns.values))
 				print("lower: ", lower)
-				print("upper: ", upper)
+				# print("upper: ", upper)
 				yield [training_set, video_labels]
 
 if __name__ == "__main__":
