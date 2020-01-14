@@ -88,7 +88,7 @@ class CNNImplement():
 		# print("Accuracy: %.2f%%" % (scores[1]*100))
 
 	def predict(self, test_x):
-		return self.model.predict(test_x)
+		return str(self.model.predict(test_x)).replace("[", "").replace("]", "")
 
 if __name__ == "__main__":
 	train_x, train_y, val_x, val_y, test_x, vocabulary = preprocess()

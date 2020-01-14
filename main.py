@@ -25,6 +25,11 @@ testing_set = test_dataProcess.get_generater_data(data_size=data_size)
 
 
 def test_print_data():
+	# train_dataProcess.shuffle_data()
+	# print(train_dataProcess.df_trains)
+	# train_dataProcess.shuffle_data()
+	# print(train_dataProcess.df_trains)
+
 	for x, y in training_set:
 		print(x.shape)
 		print(y)
@@ -47,17 +52,23 @@ if __name__ == "__main__":
 							columns=videoPreprocess.height, 
 							channels=3,
 							classification=1)
-		for _ in range(1):
+		for _ in range(10):
 			for x, y in training_set:
 				# print(x.shape)
 				# print(y)
 				model.train(train_x=x, train_y=y, epochs=1, batch_size=batch_size)
+				result = model.predict(test_x=x)
+				print("        train: ",result)
+				# if(float(result)>0.9): 
+				# 	break
 				# break
+			train_dataProcess.shuffle_data()
+			training_set = train_dataProcess.get_generater_data(data_size=data_size)
 
 		predict_label = []
 		for x, y in testing_set:
 			result = model.predict(test_x=x)
-			print(result)
-			predict_label.append(str(result).replace("[", "").replace("]", ""))
+			print("        test: ",result)
+			predict_label.append(result)
 
 		util.export(sample_submission, predict_label)

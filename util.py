@@ -100,6 +100,7 @@ class DataProcess():
 			elements = list(df_train.columns.values)
 			lower, upper = 0, data_size
 			while True:
+				print("===")
 				training_set = []
 				video_labels = []
 				for element in elements[lower:upper]:
@@ -116,10 +117,12 @@ class DataProcess():
 					break
 				if upper > len(list(df_train.columns.values)):
 					upper = len(list(df_train.columns.values))
-				print("lower: ", lower)
+				print("        video_labels: ", video_labels, end = '')
+				print("        lower: ", lower)
 				# print("upper: ", upper)
 				yield [training_set, video_labels]
-
+	def shuffle_data(self):
+		self.df_trains[0] = self.df_trains[0].sample(frac=1, axis=1)
 if __name__ == "__main__":
 	file = "train_sample_videos/aagfhgtpmv.mp4"
 	print(len(get_frames(file)))
