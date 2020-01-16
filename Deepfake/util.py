@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import pandas as pd
 import json
+import pickle
 
 import matplotlib.pyplot as plt
 from face_detection import RetinaFace
@@ -94,6 +95,19 @@ class VideoPreprocess():
 		box = box.astype(np.int)
 		cropped = frame[box[1]:box[3],box[0]:box[2]]
 		return cropped
+
+	def dump_face_detect_img(self, data):
+		file = open('important', 'wb')
+		# dump information to that file
+		pickle.dump(data, file)
+		# close the file
+		file.close()
+	def load_pickle(self):
+		file = open('important', 'rb')
+		# dump information to that file
+		data = pickle.load(file)
+		# close the file
+		file.close()
 
 LABELS = ['REAL','FAKE']
 

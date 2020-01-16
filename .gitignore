@@ -1,3 +1,4 @@
-/train_sample_videos
-/test_videos
-/__pycache__
+/Deepfake/train_sample_videos
+/Deepfake/test_videos
+/Deepfake/__pycache__
+/RealorNot/__pycache__

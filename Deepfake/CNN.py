@@ -26,7 +26,7 @@ class CNNImplement():
 						 include_top=False)
 		cnn_out = GlobalAveragePooling2D()(cnn_base.output)
 		cnn = Model(input=cnn_base.input, output=cnn_out)
-		cnn.trainable = False
+		cnn.trainable = True
 		encoded_frames = TimeDistributed(cnn)(video)
 		encoded_sequence = LSTM(256)(encoded_frames)
 		hidden_layer = Dense(output_dim=1024, activation="relu")(encoded_sequence)
