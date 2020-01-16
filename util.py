@@ -2,7 +2,9 @@ import cv2
 import numpy as np
 import pandas as pd
 import json
+
 import matplotlib.pyplot as plt
+from face_detection import RetinaFace
 
 def get_data_class(json, path, videoPreprocess):
 	df_train = pd.read_json(json)
@@ -33,6 +35,7 @@ class VideoPreprocess():
 		self.width = width
 		self.height = height
 		self.max_n_frames = max_n_frames
+		self.retinaface=RetinaFace(gpu_id=-1)
 		
 	def get_frames(self, file, print_detail=False):
 		# print("\n=== Start get_frames ===")
@@ -67,7 +70,7 @@ class VideoPreprocess():
 			ret, frame = cap.read()
 			if(ret == False or len(frames)>self.max_n_frames):
 				break
-			# frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+			frame = self._face_detect(frame)
 			frame = cv2.resize(frame, (self.width, self.height))
 			# print(frame.shape)
 			frames.append(frame)
@@ -83,6 +86,14 @@ class VideoPreprocess():
 			print(len(frames))
 			# raise "The frames less the 100"
 		return frames
+	def _face_detect(self, frame):
+		frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+		faces = self.retinaface(frame)
+		face = faces[0]
+		box, landmarks, score = face
+		box = box.astype(np.int)
+		cropped = frame[box[1]:box[3],box[0]:box[2]]
+		return cropped
 
 LABELS = ['REAL','FAKE']
 

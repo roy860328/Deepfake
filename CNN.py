@@ -28,8 +28,8 @@ class CNNImplement():
 		cnn = Model(input=cnn_base.input, output=cnn_out)
 		cnn.trainable = False
 		encoded_frames = TimeDistributed(cnn)(video)
-		encoded_sequence = LSTM(128)(encoded_frames)
-		hidden_layer = Dense(output_dim=512, activation="relu")(encoded_sequence)
+		encoded_sequence = LSTM(256)(encoded_frames)
+		hidden_layer = Dense(output_dim=1024, activation="relu")(encoded_sequence)
 		outputs = Dense(output_dim=classification, activation="sigmoid")(hidden_layer)
 		self.model = Model([video], outputs)
 		optimizer = Nadam(lr=0.002,
