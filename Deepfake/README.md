@@ -4,7 +4,7 @@
 
 ```
 Keras
-face_detection
+face_recognition
 ```
 
 ## bug
