@@ -3,14 +3,19 @@ import numpy as np
 import pandas as pd
 import json
 import pickle
+import os
 
 import matplotlib.pyplot as plt
-from face_detection import RetinaFace
+from PIL import Image
+from mtcnn import MTCNN
 
-def get_data_class(json, path, videoPreprocess):
-	df_train = pd.read_json(json)
-	print(df_train)
-	df_trains = [df_train]
+def get_data_class(json_path, path, videoPreprocess):
+	df_trains = []
+	for j_p in json_path:
+		df_train = pd.read_json(j_p)
+		print("\nget_data_class")
+		print(df_train)
+		df_trains.append(df_train)
 
 	dataProcess = DataProcess(df_trains, path, videoPreprocess)
 	return dataProcess
@@ -36,16 +41,19 @@ class VideoPreprocess():
 		self.width = width
 		self.height = height
 		self.max_n_frames = max_n_frames
-		self.retinaface=RetinaFace(gpu_id=-1)
+		self.detector = MTCNN()
 		
 	def get_frames(self, file, print_detail=False):
-		# print("\n=== Start get_frames ===")
-		# print(file)
 		cap = self._read_video(file)
 		if(print_detail):
 			self._video_info(cap)
 		frames = self._video_frame(cap)
 		return frames
+
+	# def get_face_frames(self, filename):
+	# 	face_frames = self.load_pickle(filename)
+	# 	return face_frames
+
 	def _read_video(self, file):
 		cap = cv2.VideoCapture(file)
 		if(not cap.isOpened()):
@@ -71,17 +79,20 @@ class VideoPreprocess():
 			ret, frame = cap.read()
 			if(ret == False or len(frames)>self.max_n_frames):
 				break
-			frame = self._face_detect(frame)
+
+			ret, frame = self._face_detect(frame)
+			if not (ret):
+				continue
 			frame = cv2.resize(frame, (self.width, self.height))
-			# print(frame.shape)
+
 			frames.append(frame)
-			# frame = cv2.resize(frame, (500, 500))
-			
-			# frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-			# cv2.imshow('frame', frame)
+
 			if cv2.waitKey(1) & 0xFF == ord('q'):
 				break
+		cap.release()		
 		if len(frames) < self.max_n_frames:
+			if(len(frames) == 0):
+				return frames
 			for i in range(len(frames), self.max_n_frames):
 				frames.append(frames[len(frames)-1])
 			print(len(frames))
@@ -89,25 +100,39 @@ class VideoPreprocess():
 		return frames
 	def _face_detect(self, frame):
 		frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-		faces = self.retinaface(frame)
-		face = faces[0]
-		box, landmarks, score = face
-		box = box.astype(np.int)
-		cropped = frame[box[1]:box[3],box[0]:box[2]]
-		return cropped
+		face_locations = self.detector.detect_faces(frame)
+		if (len(face_locations) == 0):
+			print("Face error")
+			return False, None
+		x, y, width, height = face_locations[0]["box"]
+		faceImage = frame[y:y+height, x:x+width]
+		cropped = faceImage
+		if (cropped.size == 0):
+			print("Face error")
+			return False, cropped
+		cropped = cv2.cvtColor(cropped, cv2.COLOR_RGB2BGR)
+		return True, cropped
 
-	def dump_face_detect_img(self, data):
-		file = open('important', 'wb')
+	def dump_face_detect_img(self, filename, data):
+		file = open(filename, 'wb')
 		# dump information to that file
 		pickle.dump(data, file)
 		# close the file
 		file.close()
-	def load_pickle(self):
-		file = open('important', 'rb')
+	def load_pickle(self, filename):
+		file = open(filename, 'rb')
 		# dump information to that file
 		data = pickle.load(file)
 		# close the file
 		file.close()
+		return data
+	def check_pickle(self, filename):
+		if os.path.isfile(filename):
+			return True
+		else:
+			return False
+	def save_image(self, name, frame):
+		cv2.imwrite(name + '.png', frame)
 
 LABELS = ['REAL','FAKE']
 
@@ -117,10 +142,32 @@ class DataProcess():
 		# print("init")
 		self.df_trains = df_trains
 		self.path = path
+		print(self.path)
 		self.videoPreprocess = videoPreprocess
+	def generate_face_images(self):
+		for index, df_train in enumerate(self.df_trains):
+			elements = list(df_train.columns.values)
+			for element in elements:
+				print("=== one element ===")
+				print(self.path[0] + element)
+				frames = self.videoPreprocess.get_frames(self.path[index] + element)
+	def generate_face_frames_pickle(self):
+		for index, df_train in enumerate(self.df_trains):
+			elements = list(df_train.columns.values)
+			for element in elements:
+				pickle_file_path = self._get_pickle_file_name(self.path[index], element)
+				print(pickle_file_path)
+				if self.videoPreprocess.check_pickle(pickle_file_path):
+					continue
+				print("=== one element ===")
+				print(self.path[0] + element)
+				frames = self.videoPreprocess.get_frames(self.path[index] + element)
+				if (len(frames) == 0):
+					continue
+				self.videoPreprocess.dump_face_detect_img(pickle_file_path, frames)
 
 	def get_generater_data(self, data_size):
-		for df_train in self.df_trains:
+		for index, df_train in enumerate(self.df_trains):
 			print("\nNew df_train")
 			elements = list(df_train.columns.values)
 			lower, upper = 0, data_size
@@ -129,25 +176,49 @@ class DataProcess():
 				training_set = []
 				video_labels = []
 				for element in elements[lower:upper]:
-					frames = self.videoPreprocess.get_frames(self.path + element)
-					training_set.append(frames)
+					print(self.path[index])
+					print(element)
+					pickle_file_path = self._get_pickle_file_name(self.path[index], element)
+					print(pickle_file_path)
+					if not os.path.isfile(pickle_file_path):
+						continue
+					frames = self.videoPreprocess.load_pickle(pickle_file_path)
+					# frames = self.videoPreprocess.get_frames(self.path[index]+element)
+					training_set.append(frames[0:self.videoPreprocess.max_n_frames])
 					video_labels.append(LABELS.index(df_train[element]['label']))
 					# video_labels.append(int(df_train[element]['label']))
-				training_set = np.asarray(training_set)
-				video_labels = np.asarray(video_labels)
-				
 				lower = upper
 				upper += data_size
 				if lower == len(list(df_train.columns.values)):
+					print("break")
 					break
 				if upper > len(list(df_train.columns.values)):
 					upper = len(list(df_train.columns.values))
+				if (len(training_set) == 0): 
+					print("pickle: none")
+					continue
+				training_set = np.asarray(training_set)
+				video_labels = np.asarray(video_labels)
+				
 				print("        video_labels: ", video_labels, end = '')
 				print("        lower: ", lower)
 				# print("upper: ", upper)
 				yield [training_set, video_labels]
 	def shuffle_data(self):
-		self.df_trains[0] = self.df_trains[0].sample(frac=1, axis=1)
+		for index, df_train in enumerate(self.df_trains): 
+			self.df_trains[index] = self.df_trains[index].sample(frac=1, axis=1)
+
+	def _get_pickle_file_name(self, path, element):
+		return path + element.replace(".mp4", "") + ".pickle"
+
 if __name__ == "__main__":
-	file = "train_sample_videos/aagfhgtpmv.mp4"
-	print(len(get_frames(file)))
+	videoPreprocess = VideoPreprocess(max_n_frames=100, width=224, height=224)
+	#
+	train_dataProcess = get_data_class(['train_00/metadata.json'], path=["train_00/"], videoPreprocess=videoPreprocess)
+	train_dataProcess.generate_face_frames_pickle()
+	# train_dataProcess.generate_face_images()
+
+	# sample_submission = pd.read_csv("sample_submission.csv")
+	# sample_submission_json = processs_data_to_json(sample_submission)
+	# test_dataProcess = get_data_class(sample_submission_json, path=["test_videos/"], videoPreprocess=videoPreprocess)
+	# test_dataProcess.generate_face_frames_pickle()

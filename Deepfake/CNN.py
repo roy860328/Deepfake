@@ -1,34 +1,112 @@
 from keras.applications.vgg16 import VGG16
+from keras.applications.resnet50 import ResNet50
 from keras.models import Model
-from keras.layers import Dense, Input
-from keras.layers.pooling import GlobalAveragePooling2D
+from keras.models import Sequential
+from keras.layers import Dense, Input, Conv2D, BatchNormalization, Activation, Conv3D
+from keras.layers.pooling import GlobalAveragePooling2D, GlobalAveragePooling3D
 from keras.layers.recurrent import LSTM
 from keras.layers.wrappers import TimeDistributed
 from keras.optimizers import Nadam
 from keras import backend as K
 
 
-LABELS = ['REAL','FAKE']
+# ### prevent
+# import tensorflow as tf
+# # from keras.backend.tensorflow_backend import set_session
+# config = tf.ConfigProto()
+# config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+# config.log_device_placement = True  # to log device placement (on which device the operation ran)
+#                                     # (nothing gets printed in Jupyter, only if you run it standalone)
+# session = tf.InteractiveSession(config=config)
+# # set_session(sess)  # set this TensorFlow session as the default session for Keras
+# K.set_session(session)
 
+## resnet3d
+# https://github.com/JihongJu/keras-resnet3d/blob/master/resnet3d/resnet3d.py
 class CNNImplement():
 	"""docstring for LSTM"""
 	def __init__(self):
 		pass
 		
-	def create_model(self, frames, rows, columns, channels, classification):
+	def create_Sequential_model(self, frames, rows, columns, channels, classification):
 		input_shape = self.check_input_format(rows, columns)	# input_shape = (rows, columns, 3)
-		video = Input(shape=(frames,
-							 input_shape[0],
+		video = Input(shape=(input_shape[0],
 							 input_shape[1],
 							 input_shape[2]))
-		cnn_base = VGG16(input_shape=input_shape,
-						 weights="imagenet",
-						 include_top=False)
-		cnn_out = GlobalAveragePooling2D()(cnn_base.output)
-		cnn = Model(input=cnn_base.input, output=cnn_out)
+		self.model = Sequential()
+		self.model.add(Conv3D(128, 7, strides=(1,1,1), padding='same', activation='relu', 
+															   input_shape=(frames,
+																		input_shape[0],
+																		input_shape[1],
+																		input_shape[2])))
+		self.model.add(Conv3D(64, 5, strides=(1,1,1), padding='same', activation='relu'))
+		# self.model.add(BatchNormalization())
+		self.model.add(Conv3D(32, 3, strides=(1,1,1), padding='same', activation='relu'))
+		self.model.add(GlobalAveragePooling3D())
+		self.model.add(Dense(output_dim=1024, activation="relu"))
+		self.model.add(Dense(output_dim=classification, activation="sigmoid"))
+		optimizer = Nadam(lr=0.002,
+						  beta_1=0.9,
+						  beta_2=0.999,
+						  epsilon=1e-08,
+						  schedule_decay=0.004)
+		self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) 
+		self.model.summary()
+	# ResNet50
+	def create_ResNet50_model(self, frames, rows, columns, channels, classification):
+			input_shape = self.check_input_format(rows, columns)	# input_shape = (rows, columns, 3)
+			video = Input(shape=(frames,
+								 input_shape[0],
+								 input_shape[1],
+								 input_shape[2]))
+			cnn_base = ResNet50(include_top=False, 
+								weights='imagenet', 
+								input_tensor=None, 
+								input_shape=input_shape, 
+								pooling=None, 
+								classes=1)
+
+			cnn_out = GlobalAveragePooling2D()(cnn_base.output)
+			cnn = Model(input=cnn_base.input, output=cnn_out)
+			cnn.trainable = True
+			encoded_frames = TimeDistributed(cnn)(video)
+			encoded_sequence = LSTM(128)(encoded_frames)
+			# encoded_sequence = LSTM(256, return_sequences=False)(cnn_out)
+			hidden_layer = Dense(output_dim=1024, activation="relu")(encoded_sequence)
+			outputs = Dense(output_dim=classification, activation="sigmoid")(hidden_layer)
+			self.model = Model([video], outputs)
+			optimizer = Nadam(lr=0.002,
+							  beta_1=0.9,
+							  beta_2=0.999,
+							  epsilon=1e-08,
+							  schedule_decay=0.004)
+			self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) 
+			self.model.summary()
+	def create_model(self, frames, rows, columns, channels, classification):
+		input_shape_ori = self.check_input_format(rows, columns)	# input_shape = (rows, columns, 3)
+		video = Input(shape=(frames,
+							 input_shape_ori[0],
+							 input_shape_ori[1],
+							 input_shape_ori[2]))
+
+		input_shape = Input(shape=(input_shape_ori))
+		conv_x = BatchNormalization()(input_shape)
+		conv_x = Conv2D(128, (7,1), padding='same')(conv_x)
+		conv_x = BatchNormalization()(conv_x)
+		conv_x = Activation('relu')(conv_x)
+
+		conv_x = Conv2D(64, (5,1), padding='same')(conv_x)
+		conv_x = BatchNormalization()(conv_x)
+		conv_x = Activation('relu')(conv_x)
+		
+		conv_x = Conv2D(32, (3,1), padding='same')(conv_x)
+			
+		cnn_out = GlobalAveragePooling2D()(conv_x)
+		cnn = Model(input=input_shape, output=cnn_out)
 		cnn.trainable = True
 		encoded_frames = TimeDistributed(cnn)(video)
-		encoded_sequence = LSTM(256)(encoded_frames)
+		encoded_sequence = LSTM(128)(encoded_frames)
+		# encoded_sequence = LSTM(256, return_sequences=False)(cnn_out)
 		hidden_layer = Dense(output_dim=1024, activation="relu")(encoded_sequence)
 		outputs = Dense(output_dim=classification, activation="sigmoid")(hidden_layer)
 		self.model = Model([video], outputs)
@@ -79,9 +157,20 @@ class CNNImplement():
 		# return input_crop
 		return input_shape
 
-	def train(self, train_x, train_y, epochs, batch_size):
-		# model.compile(loss='mean_squared_error', optimizer='adam')
-		self.model.fit(train_x, train_y, epochs=epochs, batch_size=batch_size, verbose=2)
+	def train(self, train_x, train_y, epochs, batch_size, tensorboard_callback):
+		self.model.fit(train_x, train_y, 
+						epochs=epochs, 
+						batch_size=batch_size, 
+						verbose=2, 
+						callbacks=[tensorboard_callback])
+
+	def train_generater(self, generater, steps_per_epoch, epochs, tensorboard_callback):
+		self.model.fit_generator(generater, 
+								 steps_per_epoch=steps_per_epoch, 
+								 epochs=epochs, 
+								 verbose=2, 
+								 callbacks=[tensorboard_callback], 
+								 shuffle=True)
 
 	def eval(self, val_x, val_y):
 		scores = self.model.evaluate(val_x, val_y, verbose=0)

@@ -1,27 +1,43 @@
 import pandas as pd
 import numpy as np
+from datetime import datetime
 
 import util
 import CNN
+import keras
 
-	
 ### Setting
 data_size = 1
 batch_size = 1
+max_n_frames = 100
 if batch_size > data_size:
 	batch_size = data_size
+# number_train_data always < real train data
+number_train_data = 10	#1700
+print(number_train_data)
 test = False
-sample_submission = pd.read_csv("sample_submission.csv")
-sample_submission_json = util.processs_data_to_json(sample_submission)
 
 ### Preprocess 
-videoPreprocess = util.VideoPreprocess(max_n_frames=100, width=224, height=224)
-#
-train_dataProcess = util.get_data_class('train_sample_videos/metadata.json', path="train_sample_videos/", videoPreprocess=videoPreprocess)
+videoPreprocess = util.VideoPreprocess(max_n_frames=max_n_frames, width=224, height=224)
+
+# train data
+path = ["train_sample_videos/"]#, "train_00/"]
+json_path = [p + "metadata.json" for p in path]
+train_dataProcess = util.get_data_class(json_path, path=path, videoPreprocess=videoPreprocess)
 training_set = train_dataProcess.get_generater_data(data_size=data_size)
-test_dataProcess = util.get_data_class(sample_submission_json, path="test_videos/", videoPreprocess=videoPreprocess)
+
+# test data
+sample_submission = pd.read_csv("sample_submission.csv")
+sample_submission_json = util.processs_data_to_json(sample_submission)
+path = ["test_videos/"]
+test_dataProcess = util.get_data_class([sample_submission_json], path=path, videoPreprocess=videoPreprocess)
 testing_set = test_dataProcess.get_generater_data(data_size=data_size)
 
+
+## Tensorboard
+logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+tensorboard_callback = keras.callbacks.TensorBoard(log_dir=logdir)
+# tensorboard_callback = keras.callbacks.tensorboard_v1.TensorBoard(log_dir=logdir)
 
 
 def test_print_data():
@@ -47,21 +63,24 @@ if __name__ == "__main__":
 		test_print_data()
 	else:
 		model = CNN.CNNImplement()
-		model.create_model( frames=videoPreprocess.max_n_frames, 
+		model.create_Sequential_model( frames=videoPreprocess.max_n_frames, 
 							rows=videoPreprocess.width, 
 							columns=videoPreprocess.height, 
 							channels=3,
 							classification=1)
-		for _ in range(10):
-			for x, y in training_set:
-				# print(x.shape)
-				# print(y)
-				model.train(train_x=x, train_y=y, epochs=1, batch_size=batch_size)
-				result = model.predict(test_x=x)
-				print("        train: ",result)
-				# if(float(result)>0.9): 
-				# 	break
-				# break
+		# for _ in range(10):
+		# 	print("======\n\n\n\n")
+		# 	print(_)
+		# 	for x, y in training_set:
+		# 		model.train(train_x=x, train_y=y, epochs=2, batch_size=batch_size, tensorboard_callback=tensorboard_callback)
+		# 		result = model.predict(test_x=x)
+		# 		print("        train: ",result)
+		# 	train_dataProcess.shuffle_data()
+		# 	training_set = train_dataProcess.get_generater_data(data_size=data_size)
+		for _ in range(2000):
+			print("======\n\n\n\n")
+			print(_)
+			model.train_generater(training_set, steps_per_epoch=number_train_data/batch_size, epochs=1, tensorboard_callback=tensorboard_callback)
 			train_dataProcess.shuffle_data()
 			training_set = train_dataProcess.get_generater_data(data_size=data_size)
 

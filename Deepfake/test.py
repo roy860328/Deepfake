@@ -1,73 +1,113 @@
-import pandas as pd
+import cv2
+import pickle
+from PIL import Image
+# import face_recognition
+import os
 import numpy as np
+# from mtcnn import MTCNN
 
-import util
+def load_pickle(filename):
+	file = open(filename, 'rb')
+	# dump information to that file
+	data = pickle.load(file)
+	# close the file
+	file.close()
+	return data
 
-	
-### Setting
-data_size = 1
-batch_size = 1
-if batch_size > data_size:
-	batch_size = data_size
-test = True
-sample_submission = pd.read_csv("sample_submission.csv")
-sample_submission_json = util.processs_data_to_json(sample_submission)
+def read_pickle(file):
+	frames = load_pickle(file)
+	for img in frames:
+		cv2.imshow('image',img)
+		cv2.waitKey(0)
 
-### Preprocess 
-videoPreprocess = util.VideoPreprocess(max_n_frames=100, width=224, height=224)
-#
-train_dataProcess = util.get_data_class('train_sample_videos/metadata.json', path="train_sample_videos/", videoPreprocess=videoPreprocess)
-training_set = train_dataProcess.get_generater_data(data_size=data_size)
-test_dataProcess = util.get_data_class(sample_submission_json, path="test_videos/", videoPreprocess=videoPreprocess)
-testing_set = test_dataProcess.get_generater_data(data_size=data_size)
+def face_detect():
+	img = cv2.imread("123.png")
+	face_locations = face_recognition.face_locations(img)
+	print(face_locations)
+	top, right, bottom, left = face_locations[0]
+	faceImage = img[top:bottom, left:right]
+	final = Image.fromarray(faceImage)
+	final.save("img%s.png" % (str("0")), "PNG")
 
+def face_detect_MTCNN():
+	img = cv2.cvtColor(cv2.imread("123.png"), cv2.COLOR_BGR2RGB)
+	detector = MTCNN()
+	faces = detector.detect_faces(img)
+	x, y, width, height = faces[0]["box"]
+	faceImage = img[y:y+height, x:x+width]
+	faceImage = cv2.cvtColor(faceImage, cv2.COLOR_RGB2BGR)
+	cv2.imshow('image',faceImage)
+	cv2.waitKey(0)
 
+def concatenate_video():
+	cap = cv2.VideoCapture('out.mp4',0)
+	cap1 = cv2.VideoCapture('601200231.176403.mp4',0)
 
-def test_print_data():
-	# train_dataProcess.shuffle_data()
-	# print(train_dataProcess.df_trains)
-	# train_dataProcess.shuffle_data()
-	# print(train_dataProcess.df_trains)
+	fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+	out = cv2.VideoWriter('output.mp4', fourcc, 
+							cap.get(cv2.CAP_PROP_FPS), 
+							(int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))*2, int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))))
 
-	for x, y in training_set:
-		print(x.shape)
-		print(y)
-		break
-	predict_label = []
-	for x, y in testing_set:
-		print(x.shape)
-		predict_label.append("1")
-		break
-	util.export(sample_submission, predict_label)
+	while(cap.isOpened()):
 
-if __name__ == "__main__":
+		ret, frame = cap.read()
+		ret1, frame1 = cap1.read()
+		if ret == True and ret1 == True: 
+			both = np.concatenate((frame, frame1), axis=1)
+			# cv2.imshow('Frame', both)
+			out.write(both)
+			if cv2.waitKey(1) & 0xFF == ord('q'):
+				break
+		else: 
+			break
 
-	if test:
-		test_print_data()
-	else:
-		model = CNN.CNNImplement()
-		model.create_model( frames=videoPreprocess.max_n_frames, 
-							rows=videoPreprocess.width, 
-							columns=videoPreprocess.height, 
-							channels=3,
-							classification=1)
-		for _ in range(10):
-			for x, y in training_set:
-				# print(x.shape)
-				# print(y)
-				model.train(train_x=x, train_y=y, epochs=1, batch_size=batch_size)
-				result = model.predict(test_x=x)
-				print("        train: ",result)
-				# if(float(result)>0.9): 
-				# 	break
-				# break
-			train_dataProcess.shuffle_data()
-			training_set = train_dataProcess.get_generater_data(data_size=data_size)
+	cap.release()
+	cap1.release()
+	out.release()
 
-		predict_label = []
-		for x, y in testing_set:
-			result = model.predict(test_x=x)
-			print("        test: ",result)
-			predict_label.append(result)
+	# cv2.waitKey(0)
+	cv2.destroyAllWindows()
 
-		util.export(sample_submission, predict_label)
+def resize_img(path, width, height):
+	for file_name in os.listdir(path):
+		if file_name.find(".jpg") == -1:
+			continue
+		print("\nFile: "+ file_name)
+		img = cv2.imread(path + file_name)
+		img = cv2.resize(img, (width, height))
+
+		cv2.imwrite(path + file_name, img)
+
+def resize_video(path, width, height):
+	cap = cv2.VideoCapture(path,0)
+
+	fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+	out = cv2.VideoWriter("d_" + path, fourcc, 
+							cap.get(cv2.CAP_PROP_FPS), 
+							(width, height))
+	# out = cv2.VideoWriter('resizeviode.mp4', fourcc, 
+	# 						cap.get(cv2.CAP_PROP_FPS), 
+	# 						(width, height))
+	while(cap.isOpened()):
+
+		ret, frame = cap.read()
+		if ret == True: 
+			frame = cv2.resize(frame, (width, height))
+			out.write(frame)
+			if cv2.waitKey(1) & 0xFF == ord('q'):
+				break
+		else: 
+			break
+	cap.release()
+	out.release()
+	cv2.destroyAllWindows()
+
+# if os.path.isdir("test_videos/"):
+# 	print("isdir")
+# 	os.makedirs('eye\\')
+
+# concatenate_video()
+read_pickle("zxprilbsxp.pickle")
+# face_detect_MTCNN()
+# resize_img("./", 640, 480)
+# resize_video("601200230.656149.mp4", 640, 480)

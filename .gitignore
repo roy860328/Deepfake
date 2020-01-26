@@ -1,4 +1,5 @@
 /Deepfake/train_sample_videos
 /Deepfake/test_videos
 /Deepfake/__pycache__
+/Deepfake/train_00
 /RealorNot/__pycache__
