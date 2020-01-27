@@ -15,6 +15,7 @@ def get_data_class(json_path, path, videoPreprocess):
 		df_train = pd.read_json(j_p)
 		print("\nget_data_class")
 		print(df_train)
+		print(df_train.isnull().any())
 		df_trains.append(df_train)
 
 	dataProcess = DataProcess(df_trains, path, videoPreprocess)

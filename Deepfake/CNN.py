@@ -3,23 +3,24 @@ from keras.applications.resnet50 import ResNet50
 from keras.models import Model
 from keras.models import Sequential
 from keras.layers import Dense, Input, Conv2D, BatchNormalization, Activation, Conv3D
-from keras.layers.pooling import GlobalAveragePooling2D, GlobalAveragePooling3D
+from keras.layers.pooling import GlobalAveragePooling2D, GlobalAveragePooling3D, MaxPooling3D
 from keras.layers.recurrent import LSTM
 from keras.layers.wrappers import TimeDistributed
-from keras.optimizers import Nadam
+from keras.optimizers import Nadam, Adamax, RMSprop
 from keras import backend as K
-
+from keras.losses import binary_crossentropy
+import time
 
 # ### prevent
-# import tensorflow as tf
-# # from keras.backend.tensorflow_backend import set_session
-# config = tf.ConfigProto()
-# config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-# config.log_device_placement = True  # to log device placement (on which device the operation ran)
-#                                     # (nothing gets printed in Jupyter, only if you run it standalone)
-# session = tf.InteractiveSession(config=config)
-# # set_session(sess)  # set this TensorFlow session as the default session for Keras
-# K.set_session(session)
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+config.log_device_placement = True  # to log device placement (on which device the operation ran)
+                                    # (nothing gets printed in Jupyter, only if you run it standalone)
+session = tf.InteractiveSession(config=config)
+# set_session(sess)  # set this TensorFlow session as the default session for Keras
+K.set_session(session)
 
 ## resnet3d
 # https://github.com/JihongJu/keras-resnet3d/blob/master/resnet3d/resnet3d.py
@@ -34,23 +35,29 @@ class CNNImplement():
 							 input_shape[1],
 							 input_shape[2]))
 		self.model = Sequential()
-		self.model.add(Conv3D(128, 7, strides=(1,1,1), padding='same', activation='relu', 
+		a = 128
+		# a = 32
+		self.model.add(Conv3D(a, 7, strides=(1,1,1), padding='same', activation='relu', 
 															   input_shape=(frames,
 																		input_shape[0],
 																		input_shape[1],
 																		input_shape[2])))
 		self.model.add(Conv3D(64, 5, strides=(1,1,1), padding='same', activation='relu'))
-		# self.model.add(BatchNormalization())
 		self.model.add(Conv3D(32, 3, strides=(1,1,1), padding='same', activation='relu'))
+		# self.model.add(MaxPooling3D())
 		self.model.add(GlobalAveragePooling3D())
-		self.model.add(Dense(output_dim=1024, activation="relu"))
+		self.model.add(Dense(output_dim=512, activation="relu"))
 		self.model.add(Dense(output_dim=classification, activation="sigmoid"))
+		# self.model.add(Dense(1, activation="sigmoid"))
 		optimizer = Nadam(lr=0.002,
 						  beta_1=0.9,
 						  beta_2=0.999,
 						  epsilon=1e-08,
 						  schedule_decay=0.004)
-		self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) 
+		optimizer = Adamax(clipnorm=1.)
+		# optimizer = RMSprop(clipnorm=1.)binary_crossentropy
+		# self.model.compile(optimizer='adam', loss="binary_crossentropy", metrics=['accuracy', self.custom_loss_function]) 
+		self.model.compile(optimizer='adam', loss=self.custom_loss_function, metrics=['accuracy', self.custom_loss_function]) 
 		self.model.summary()
 	# ResNet50
 	def create_ResNet50_model(self, frames, rows, columns, channels, classification):
@@ -156,6 +163,21 @@ class CNNImplement():
 		# input_crop = Input(shape=input_shape)
 		# return input_crop
 		return input_shape
+
+	def custom_loss_function(self, y_real, y_predict):
+		# import math 
+		# custom_loss = y_real * math.log(y_predict) + (1-y_real) * math.log((1-y_predict))
+		# y_real = K.print_tensor(y_real, message='y_real = ')
+		y_predict = K.print_tensor(y_predict, message='y_predict = ')
+
+		y_predict = K.clip(y_predict, 1e-3, 1 - 1e-3)
+		custom_loss = -K.mean( y_real*K.log(y_predict) + (1-y_real)*K.log(1-y_predict) )
+		# custom_loss = -( K.log(y_real-y_predict))
+		# custom_loss = binary_crossentropy(y_real, y_predict)
+		# custom_loss = K.mean( (y_real-y_predict)**2 )
+
+		# custom_loss = K.print_tensor(custom_loss, message='custom_loss = ')
+		return custom_loss
 
 	def train(self, train_x, train_y, epochs, batch_size, tensorboard_callback):
 		self.model.fit(train_x, train_y, 

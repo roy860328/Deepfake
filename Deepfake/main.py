@@ -9,7 +9,7 @@ import keras
 ### Setting
 data_size = 1
 batch_size = 1
-max_n_frames = 100
+max_n_frames = 75
 if batch_size > data_size:
 	batch_size = data_size
 # number_train_data always < real train data
