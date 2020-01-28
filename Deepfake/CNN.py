@@ -9,6 +9,7 @@ from keras.layers.wrappers import TimeDistributed
 from keras.optimizers import Nadam, Adamax, RMSprop
 from keras import backend as K
 from keras.losses import binary_crossentropy
+from keras.models import load_model
 import time
 
 # ### prevent
@@ -55,40 +56,39 @@ class CNNImplement():
 						  epsilon=1e-08,
 						  schedule_decay=0.004)
 		optimizer = Adamax(clipnorm=1.)
-		# optimizer = RMSprop(clipnorm=1.)binary_crossentropy
 		# self.model.compile(optimizer='adam', loss="binary_crossentropy", metrics=['accuracy', self.custom_loss_function]) 
 		self.model.compile(optimizer='adam', loss=self.custom_loss_function, metrics=['accuracy', self.custom_loss_function]) 
 		self.model.summary()
 	# ResNet50
 	def create_ResNet50_model(self, frames, rows, columns, channels, classification):
-			input_shape = self.check_input_format(rows, columns)	# input_shape = (rows, columns, 3)
-			video = Input(shape=(frames,
-								 input_shape[0],
-								 input_shape[1],
-								 input_shape[2]))
-			cnn_base = ResNet50(include_top=False, 
-								weights='imagenet', 
-								input_tensor=None, 
-								input_shape=input_shape, 
-								pooling=None, 
-								classes=1)
+		input_shape = self.check_input_format(rows, columns)	# input_shape = (rows, columns, 3)
+		video = Input(shape=(frames,
+							 input_shape[0],
+							 input_shape[1],
+							 input_shape[2]))
+		cnn_base = ResNet50(include_top=False, 
+							weights='imagenet', 
+							input_tensor=None, 
+							input_shape=input_shape, 
+							pooling=None, 
+							classes=1)
 
-			cnn_out = GlobalAveragePooling2D()(cnn_base.output)
-			cnn = Model(input=cnn_base.input, output=cnn_out)
-			cnn.trainable = True
-			encoded_frames = TimeDistributed(cnn)(video)
-			encoded_sequence = LSTM(128)(encoded_frames)
-			# encoded_sequence = LSTM(256, return_sequences=False)(cnn_out)
-			hidden_layer = Dense(output_dim=1024, activation="relu")(encoded_sequence)
-			outputs = Dense(output_dim=classification, activation="sigmoid")(hidden_layer)
-			self.model = Model([video], outputs)
-			optimizer = Nadam(lr=0.002,
-							  beta_1=0.9,
-							  beta_2=0.999,
-							  epsilon=1e-08,
-							  schedule_decay=0.004)
-			self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']) 
-			self.model.summary()
+		cnn_out = GlobalAveragePooling2D()(cnn_base.output)
+		cnn = Model(input=cnn_base.input, output=cnn_out)
+		cnn.trainable = True
+		encoded_frames = TimeDistributed(cnn)(video)
+		encoded_sequence = LSTM(128)(encoded_frames)
+		# encoded_sequence = LSTM(256, return_sequences=False)(cnn_out)
+		hidden_layer = Dense(output_dim=512, activation="relu")(encoded_sequence)
+		outputs = Dense(output_dim=classification, activation="sigmoid")(hidden_layer)
+		self.model = Model([video], outputs)
+		optimizer = Nadam(lr=0.002,
+						  beta_1=0.9,
+						  beta_2=0.999,
+						  epsilon=1e-08,
+						  schedule_decay=0.004)
+		self.model.compile(optimizer='adam', loss=self.custom_loss_function, metrics=['accuracy', self.custom_loss_function]) 
+		self.model.summary()
 	def create_model(self, frames, rows, columns, channels, classification):
 		input_shape_ori = self.check_input_format(rows, columns)	# input_shape = (rows, columns, 3)
 		video = Input(shape=(frames,
@@ -200,6 +200,13 @@ class CNNImplement():
 
 	def predict(self, test_x):
 		return str(self.model.predict(test_x)).replace("[", "").replace("]", "")
+
+	def load_model(self, path):
+		# self.model = load_model(path + ".h5", custom_objects={'custom_loss_function': self.custom_loss_function})
+		self.model.load_weights(path + ".h5")
+	def save_model(self, path):
+		self.model.save(path + ".h5")
+
 
 if __name__ == "__main__":
 	train_x, train_y, val_x, val_y, test_x, vocabulary = preprocess()

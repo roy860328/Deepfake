@@ -59,30 +59,35 @@ def test_print_data():
 
 if __name__ == "__main__":
 
+	model = CNN.CNNImplement()
+	model.create_ResNet50_model( frames=videoPreprocess.max_n_frames, 
+						rows=videoPreprocess.width, 
+						columns=videoPreprocess.height, 
+						channels=3,
+						classification=1)
 	if test:
-		test_print_data()
+		# test_print_data()
+		print("\n\n\n\n\n\n\n\n\n\n\n=======  load  =======")
+		model.load_model("logs/scalars/" + "20200128-065253_ResNet50_model")
+
+		predict_label = []
+		for x, y in testing_set:
+			result = model.predict(test_x=x)
+			print("        test: ",result)
+			predict_label.append(result)
+
+		util.export(sample_submission, predict_label)
+
 	else:
-		model = CNN.CNNImplement()
-		model.create_Sequential_model( frames=videoPreprocess.max_n_frames, 
-							rows=videoPreprocess.width, 
-							columns=videoPreprocess.height, 
-							channels=3,
-							classification=1)
-		# for _ in range(10):
-		# 	print("======\n\n\n\n")
-		# 	print(_)
-		# 	for x, y in training_set:
-		# 		model.train(train_x=x, train_y=y, epochs=2, batch_size=batch_size, tensorboard_callback=tensorboard_callback)
-		# 		result = model.predict(test_x=x)
-		# 		print("        train: ",result)
-		# 	train_dataProcess.shuffle_data()
-		# 	training_set = train_dataProcess.get_generater_data(data_size=data_size)
+
 		for _ in range(2000):
 			print("======\n\n\n\n")
 			print(_)
 			model.train_generater(training_set, steps_per_epoch=number_train_data/batch_size, epochs=1, tensorboard_callback=tensorboard_callback)
 			train_dataProcess.shuffle_data()
 			training_set = train_dataProcess.get_generater_data(data_size=data_size)
+
+		model.save_model(logdir + "_ResNet50_model")
 
 		predict_label = []
 		for x, y in testing_set:
