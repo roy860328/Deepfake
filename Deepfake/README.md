@@ -25,3 +25,9 @@ to
 ```
 load_weights(path + ".h5")
 ```
+
+### loss nan
+取log的數值過小或過大，造成bug，透過clip，確保不會overflow
+```
+K.clip(y_predict, 1e-3, 1 - 1e-3)
+```
