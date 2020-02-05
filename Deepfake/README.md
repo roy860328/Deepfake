@@ -3,7 +3,8 @@
 ## Requirements
 
 ```
-Keras
+Keras==2.1.5
+tensorflow-gpu==1.8.0
 mtcnn==0.1.0
 h5py
 ```
