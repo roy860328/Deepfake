@@ -10,18 +10,30 @@ from keras.optimizers import Nadam, Adamax, RMSprop
 from keras import backend as K
 from keras.losses import binary_crossentropy
 from keras.models import load_model
+from keras.utils import multi_gpu_model
+
 import time
 
-# ### prevent
+# # ### prevent
 import tensorflow as tf
-from keras.backend.tensorflow_backend import set_session
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-config.log_device_placement = True  # to log device placement (on which device the operation ran)
-                                    # (nothing gets printed in Jupyter, only if you run it standalone)
-session = tf.InteractiveSession(config=config)
-# set_session(sess)  # set this TensorFlow session as the default session for Keras
-K.set_session(session)
+# from keras.backend.tensorflow_backend import set_session
+# config = tf.ConfigProto()
+# config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+# config.log_device_placement = True  # to log device placement (on which device the operation ran)
+#                                     # (nothing gets printed in Jupyter, only if you run it standalone)
+# session = tf.InteractiveSession(config=config)
+# # set_session(sess)  # set this TensorFlow session as the default session for Keras
+# K.set_session(session)
+
+## 
+with K.tf.device('/gpu:0'):
+	config = tf.ConfigProto(intra_op_parallelism_threads=4,\
+		   inter_op_parallelism_threads=4, allow_soft_placement=True,\
+		   device_count = {'CPU' : 1, 'GPU' : 2})
+	config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+	config.log_device_placement = True  # to log device placement (on which device the operation ran)
+	session = tf.Session(config=config)
+	K.set_session(session)
 
 ## resnet3d
 # https://github.com/JihongJu/keras-resnet3d/blob/master/resnet3d/resnet3d.py
@@ -82,13 +94,14 @@ class CNNImplement():
 		hidden_layer = Dense(output_dim=512, activation="relu")(encoded_sequence)
 		outputs = Dense(output_dim=classification, activation="sigmoid")(hidden_layer)
 		self.model = Model([video], outputs)
+		self.gpu_model = multi_gpu_model(self.model, gpus=2)
 		optimizer = Nadam(lr=0.002,
 						  beta_1=0.9,
 						  beta_2=0.999,
 						  epsilon=1e-08,
 						  schedule_decay=0.004)
-		self.model.compile(optimizer='adam', loss=self.custom_loss_function, metrics=['accuracy', self.custom_loss_function]) 
-		self.model.summary()
+		self.gpu_model.compile(optimizer='adam', loss=self.custom_loss_function, metrics=['accuracy', self.custom_loss_function]) 
+		self.gpu_model.summary()
 	def create_model(self, frames, rows, columns, channels, classification):
 		input_shape_ori = self.check_input_format(rows, columns)	# input_shape = (rows, columns, 3)
 		video = Input(shape=(frames,
@@ -180,26 +193,27 @@ class CNNImplement():
 		return custom_loss
 
 	def train(self, train_x, train_y, epochs, batch_size, tensorboard_callback):
-		self.model.fit(train_x, train_y, 
+		self.gpu_model.fit(train_x, train_y, 
 						epochs=epochs, 
 						batch_size=batch_size, 
 						verbose=2, 
 						callbacks=[tensorboard_callback])
 
 	def train_generater(self, generater, steps_per_epoch, epochs, tensorboard_callback):
-		self.model.fit_generator(generater, 
+		self.gpu_model.fit_generator(generater, 
 								 steps_per_epoch=steps_per_epoch, 
 								 epochs=epochs, 
 								 verbose=2, 
 								 callbacks=[tensorboard_callback], 
-								 shuffle=True)
+								 shuffle=True,
+								 max_queue_size=2)
 
 	def eval(self, val_x, val_y):
-		scores = self.model.evaluate(val_x, val_y, verbose=0)
+		scores = self.gpu_model.evaluate(val_x, val_y, verbose=0)
 		# print("Accuracy: %.2f%%" % (scores[1]*100))
 
 	def predict(self, test_x):
-		return str(self.model.predict(test_x)).replace("[", "").replace("]", "")
+		return str(self.gpu_model.predict(test_x)).replace("[", "").replace("]", "")
 
 	def load_model(self, path):
 		# self.model = load_model(path + ".h5", custom_objects={'custom_loss_function': self.custom_loss_function})

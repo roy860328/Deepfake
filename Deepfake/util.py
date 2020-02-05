@@ -186,6 +186,7 @@ class DataProcess():
 					frames = self.videoPreprocess.load_pickle(pickle_file_path)
 					# frames = self.videoPreprocess.get_frames(self.path[index]+element)
 					training_set.append(frames[0:self.videoPreprocess.max_n_frames])
+					frames = []
 					video_labels.append(LABELS.index(df_train[element]['label']))
 					# video_labels.append(int(df_train[element]['label']))
 				lower = upper

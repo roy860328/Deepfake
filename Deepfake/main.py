@@ -1,19 +1,20 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime
-
+import time
 import util
 import CNN
 import keras
 
 ### Setting
-data_size = 1
-batch_size = 1
-max_n_frames = 75
+data_size = 2
+batch_size = 2
+max_n_frames = 50
 if batch_size > data_size:
 	batch_size = data_size
 # number_train_data always < real train data
-number_train_data = 10	#1700
+number_train_data = 10
+number_train_data = 1700 #10
 print(number_train_data)
 test = False
 
@@ -21,7 +22,7 @@ test = False
 videoPreprocess = util.VideoPreprocess(max_n_frames=max_n_frames, width=224, height=224)
 
 # train data
-path = ["train_sample_videos/"]#, "train_00/"]
+path = ["train_sample_videos/", "train_00/"]
 json_path = [p + "metadata.json" for p in path]
 train_dataProcess = util.get_data_class(json_path, path=path, videoPreprocess=videoPreprocess)
 training_set = train_dataProcess.get_generater_data(data_size=data_size)
@@ -31,7 +32,6 @@ sample_submission = pd.read_csv("sample_submission.csv")
 sample_submission_json = util.processs_data_to_json(sample_submission)
 path = ["test_videos/"]
 test_dataProcess = util.get_data_class([sample_submission_json], path=path, videoPreprocess=videoPreprocess)
-testing_set = test_dataProcess.get_generater_data(data_size=data_size)
 
 
 ## Tensorboard
@@ -79,16 +79,21 @@ if __name__ == "__main__":
 		util.export(sample_submission, predict_label)
 
 	else:
-
-		for _ in range(2000):
-			print("======\n\n\n\n")
+		load_model_path = "logs/scalars/" + "ResNet50_model_0"
+		model.load_model(load_model_path)
+		for _ in range(20000):
+			print("======\n\n\n\n\n\n\n\n")
 			print(_)
 			model.train_generater(training_set, steps_per_epoch=number_train_data/batch_size, epochs=1, tensorboard_callback=tensorboard_callback)
 			train_dataProcess.shuffle_data()
 			training_set = train_dataProcess.get_generater_data(data_size=data_size)
+			if (int(_%10) == 0):
+				print("save")
+				time.sleep(1)
+				epochs = int(load_model_path.rsplit("_", 1)[1]) + _
+				model.save_model("logs/scalars/" + "ResNet50_model_" + str(epochs))
 
-		model.save_model(logdir + "_ResNet50_model")
-
+		testing_set = test_dataProcess.get_generater_data(data_size=data_size)
 		predict_label = []
 		for x, y in testing_set:
 			result = model.predict(test_x=x)
