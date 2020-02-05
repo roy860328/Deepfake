@@ -4,7 +4,7 @@
 
 ```
 Keras
-face_recognition
+mtcnn==0.1.0
 h5py
 ```
 
